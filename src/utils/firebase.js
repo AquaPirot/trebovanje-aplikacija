@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { initialCategories } from './initialData';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAFKmB111lpF-bYI5o_hlmt2f--zPNh4Io",
@@ -13,6 +14,27 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Funkcija za sortiranje artikala po originalnom redosledu
+const sortItemsByOriginalOrder = (items) => {
+  return items.sort((a, b) => {
+    // Prvo po kategoriji
+    if (a.category !== b.category) {
+      return a.category.localeCompare(b.category);
+    }
+    
+    // Zatim po originalnom redosledu unutar kategorije
+    const categoryItems = initialCategories[a.category] || [];
+    const indexA = categoryItems.findIndex(item => item.name === a.name);
+    const indexB = categoryItems.findIndex(item => item.name === b.name);
+    
+    // Ako artikal nije u originalnoj listi, stavi ga na kraj
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+    
+    return indexA - indexB;
+  });
+};
 
 export const saveItemToFirebase = async (itemData) => {
   try {
@@ -35,8 +57,10 @@ export const getItemsFromFirebase = async () => {
     querySnapshot.forEach((doc) => {
       items.push({ id: doc.id, ...doc.data() });
     });
-    console.log('✅ Učitano', items.length, 'stavki');
-    return items;
+    
+    const sortedItems = sortItemsByOriginalOrder(items);
+    console.log('✅ Učitano', sortedItems.length, 'stavki');
+    return sortedItems;
   } catch (error) {
     console.error('❌ Greška pri učitavanju:', error);
     return [];
@@ -60,6 +84,8 @@ export const listenToItems = (callback) => {
     querySnapshot.forEach((doc) => {
       items.push({ id: doc.id, ...doc.data() });
     });
-    callback(items);
+    
+    const sortedItems = sortItemsByOriginalOrder(items);
+    callback(sortedItems);
   });
 };
