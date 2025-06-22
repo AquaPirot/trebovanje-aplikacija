@@ -95,6 +95,14 @@ export default function TrebovanjeApp() {
     'DOMAĆA ALKOHOLNA PIĆA', 'BELA VINA', 'CRVENA VINA', 'ROZE VINA', 'VINA 0,187L'
   ];
 
+  // Dodaj sve kategorije iz groupedItems koje nisu u categoryOrder
+  const allCategories = [...categoryOrder];
+  Object.keys(groupedItems).forEach(category => {
+    if (!allCategories.includes(category)) {
+      allCategories.push(category);
+    }
+  });
+
   const updateOrder = (item, value) => {
     const quantity = parseFloat(parseFloat(value).toFixed(2));
     
@@ -139,6 +147,27 @@ export default function TrebovanjeApp() {
           message += `• ${orderLine}\n`;
         });
         message += '\n';
+      }
+    });
+
+    // Dodaj sve ostale kategorije koje nisu u categoryOrder
+    allCategories.forEach(category => {
+      if (!categoryOrder.includes(category)) {
+        const categoryItems = groupedItems[category] || [];
+        const categoryOrders = categoryItems.filter(item => orders[item.id]);
+        
+        if (categoryOrders.length > 0) {
+          message += `📂 ${category}\n`;
+          message += `${'─'.repeat(30)}\n`;
+          categoryOrders.forEach(item => {
+            let orderLine = `${orders[item.id]} × ${item.name}`;
+            if (variants[item.id]) {
+              orderLine += ` (${variants[item.id]})`;
+            }
+            message += `• ${orderLine}\n`;
+          });
+          message += '\n';
+        }
       }
     });
 
@@ -365,7 +394,7 @@ export default function TrebovanjeApp() {
                   Trebovanje pića
                 </h1>
                 <p className="text-xs text-gray-500">
-                  {categoryOrder.filter(cat => groupedItems[cat]?.length > 0).length} kategorija • {items.length} artikala
+                  {allCategories.filter(cat => groupedItems[cat]?.length > 0).length} kategorija • {items.length} artikala
                 </p>
               </div>
             </div>
@@ -474,7 +503,7 @@ export default function TrebovanjeApp() {
         ) : (
           /* Kategorije grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categoryOrder.map(category => {
+            {allCategories.map(category => {
               const categoryItems = groupedItems[category] || [];
               if (categoryItems.length === 0) return null;
               
