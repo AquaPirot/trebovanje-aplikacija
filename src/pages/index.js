@@ -428,7 +428,7 @@ export default function TrebovanjeApp() {
           /* Rezultati pretrage */
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Rezultati pretrage za "{searchTerm}"
+              Rezultati pretrage za &ldquo;{searchTerm}&rdquo;
             </h2>
             {Object.entries(filteredGroupedItems).map(([category, categoryItems]) => (
               <div key={category} className={`bg-gradient-to-r ${getCategoryColor(category)} rounded-xl border-2 p-4 shadow-lg`}>
