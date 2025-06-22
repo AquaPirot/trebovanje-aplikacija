@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getItemsFromFirebase, saveItemToFirebase, deleteItemFromFirebase, listenToItems } from '../utils/firebase';
-import { initialCategories } from '../utils/initialData';
-import { Coffee, Wine, Beer, GlassWater, Search, Plus, Minus, Copy, Send, Download, Settings, Trash2 } from 'lucide-react';
+import { getItemsFromDatabase, saveItemToDatabase, deleteItemFromDatabase, listenToItems } from '../utils/storage';
+import { Coffee, Wine, Beer, GlassWater, Search, Plus, Minus, Copy, Send, Settings, Trash2, X, ShoppingCart, ArrowLeft, Check } from 'lucide-react';
 
 export default function TrebovanjeApp() {
   const [items, setItems] = useState([]);
@@ -11,19 +10,17 @@ export default function TrebovanjeApp() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
+  const [showOrderSummary, setShowOrderSummary] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [copySuccess, setCopySuccess] = useState(false);
 
-  // Učitavanje stavki iz Firebase
+  // Učitavanje stavki iz baze
   useEffect(() => {
     const loadItems = async () => {
       try {
-        const firebaseItems = await getItemsFromFirebase();
-        if (firebaseItems.length === 0) {
-          // Ako nema stavki u Firebase, učitaj početne podatke
-          await initializeItems();
-        } else {
-          setItems(firebaseItems);
-        }
+        const databaseItems = await getItemsFromDatabase();
+        setItems(databaseItems);
       } catch (error) {
         console.error('Greška pri učitavanju:', error);
       } finally {
@@ -33,7 +30,6 @@ export default function TrebovanjeApp() {
 
     loadItems();
 
-    // Real-time listener
     const unsubscribe = listenToItems((newItems) => {
       setItems(newItems);
       setLoading(false);
@@ -42,48 +38,46 @@ export default function TrebovanjeApp() {
     return () => unsubscribe();
   }, []);
 
-  const initializeItems = async () => {
-    try {
-      const allItems = [];
-      for (const [category, categoryItems] of Object.entries(initialCategories)) {
-        for (const item of categoryItems) {
-          const itemData = {
-            name: item.name,
-            category: category,
-            unit: item.unit,
-            variants: item.variants || []
-          };
-          allItems.push(itemData);
-        }
-      }
-      
-      // Sačuvaj sve u Firebase
-      for (const item of allItems) {
-        await saveItemToFirebase(item);
-      }
-    } catch (error) {
-      console.error('Greška pri inicijalizaciji:', error);
-    }
-  };
-
   const getCategoryIcon = (category) => {
+    const iconClass = "w-5 h-5";
     switch(category) {
-      case 'TOPLI NAPICI': return <Coffee className="w-5 h-5 text-amber-600" />;
+      case 'TOPLI NAPICI': return <Coffee className={`${iconClass} text-amber-500`} />;
       case 'BEZALKOHOLNA PIĆA':
       case 'CEDEVITA I ENERGETSKA PIĆA':
-      case 'NEXT SOKOVI': return <GlassWater className="w-5 h-5 text-blue-600" />;
+      case 'NEXT SOKOVI': return <GlassWater className={`${iconClass} text-blue-500`} />;
       case 'PIVA':
-      case 'SOMERSBY': return <Beer className="w-5 h-5 text-yellow-600" />;
+      case 'SOMERSBY': return <Beer className={`${iconClass} text-yellow-500`} />;
       case 'BELA VINA':
       case 'CRVENA VINA':
       case 'ROZE VINA':
-      case 'VINA 0,187L': return <Wine className="w-5 h-5 text-rose-600" />;
+      case 'VINA 0,187L': return <Wine className={`${iconClass} text-purple-500`} />;
       case 'ŽESTOKA PIĆA':
       case 'VISKI':
       case 'BRENDI I KONJACI':
       case 'LIKERI':
-      case 'DOMAĆA ALKOHOLNA PIĆA': return <GlassWater className="w-5 h-5 text-purple-600" />;
+      case 'DOMAĆA ALKOHOLNA PIĆA': return <GlassWater className={`${iconClass} text-red-500`} />;
       default: return null;
+    }
+  };
+
+  const getCategoryColor = (category) => {
+    switch(category) {
+      case 'TOPLI NAPICI': return 'from-amber-100 to-orange-100 border-amber-300 hover:from-amber-200 hover:to-orange-200';
+      case 'BEZALKOHOLNA PIĆA': return 'from-blue-100 to-cyan-100 border-blue-300 hover:from-blue-200 hover:to-cyan-200';
+      case 'CEDEVITA I ENERGETSKA PIĆA': return 'from-green-100 to-emerald-100 border-green-300 hover:from-green-200 hover:to-emerald-200';
+      case 'NEXT SOKOVI': return 'from-purple-100 to-violet-100 border-purple-300 hover:from-purple-200 hover:to-violet-200';
+      case 'PIVA': return 'from-yellow-100 to-amber-100 border-yellow-300 hover:from-yellow-200 hover:to-amber-200';
+      case 'SOMERSBY': return 'from-pink-100 to-rose-100 border-pink-300 hover:from-pink-200 hover:to-rose-200';
+      case 'ŽESTOKA PIĆA': return 'from-red-100 to-pink-100 border-red-300 hover:from-red-200 hover:to-pink-200';
+      case 'VISKI': return 'from-orange-100 to-red-100 border-orange-300 hover:from-orange-200 hover:to-red-200';
+      case 'BRENDI I KONJACI': return 'from-amber-100 to-yellow-100 border-amber-300 hover:from-amber-200 hover:to-yellow-200';
+      case 'LIKERI': return 'from-purple-100 to-pink-100 border-purple-300 hover:from-purple-200 hover:to-pink-200';
+      case 'DOMAĆA ALKOHOLNA PIĆA': return 'from-gray-100 to-slate-100 border-gray-300 hover:from-gray-200 hover:to-slate-200';
+      case 'BELA VINA': return 'from-emerald-100 to-teal-100 border-emerald-300 hover:from-emerald-200 hover:to-teal-200';
+      case 'CRVENA VINA': return 'from-rose-100 to-red-100 border-rose-300 hover:from-rose-200 hover:to-red-200';
+      case 'ROZE VINA': return 'from-pink-100 to-rose-100 border-pink-300 hover:from-pink-200 hover:to-rose-200';
+      case 'VINA 0,187L': return 'from-indigo-100 to-purple-100 border-indigo-300 hover:from-indigo-200 hover:to-purple-200';
+      default: return 'from-gray-100 to-slate-100 border-gray-300 hover:from-gray-200 hover:to-slate-200';
     }
   };
 
@@ -95,17 +89,11 @@ export default function TrebovanjeApp() {
     return acc;
   }, {});
 
-  const filteredItems = searchTerm ? 
-    items.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase())) :
-    items;
-
-  const filteredGroupedItems = filteredItems.reduce((acc, item) => {
-    if (!acc[item.category]) {
-      acc[item.category] = [];
-    }
-    acc[item.category].push(item);
-    return acc;
-  }, {});
+  const categoryOrder = [
+    'TOPLI NAPICI', 'BEZALKOHOLNA PIĆA', 'CEDEVITA I ENERGETSKA PIĆA', 'NEXT SOKOVI',
+    'PIVA', 'SOMERSBY', 'ŽESTOKA PIĆA', 'VISKI', 'BRENDI I KONJACI', 'LIKERI',
+    'DOMAĆA ALKOHOLNA PIĆA', 'BELA VINA', 'CRVENA VINA', 'ROZE VINA', 'VINA 0,187L'
+  ];
 
   const updateOrder = (item, value) => {
     const quantity = parseFloat(parseFloat(value).toFixed(2));
@@ -128,209 +116,492 @@ export default function TrebovanjeApp() {
     setVariants({...variants, [itemId]: variant});
   };
 
+  const getTotalItems = () => {
+    return Object.keys(orders).length;
+  };
+
   const generateOrder = () => {
-    let message = `📋 TREBOVANJE ${new Date().toLocaleDateString('sr-RS')}\n\n`;
+    let message = `🍷 TREBOVANJE ${new Date().toLocaleDateString('sr-RS')}\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
     
-    Object.entries(groupedItems).forEach(([category, categoryItems]) => {
+    categoryOrder.forEach(category => {
+      const categoryItems = groupedItems[category] || [];
       const categoryOrders = categoryItems.filter(item => orders[item.id]);
+      
       if (categoryOrders.length > 0) {
-        message += `${category}\n`;
+        message += `📂 ${category}\n`;
+        message += `${'─'.repeat(30)}\n`;
         categoryOrders.forEach(item => {
           let orderLine = `${orders[item.id]} × ${item.name}`;
           if (variants[item.id]) {
             orderLine += ` (${variants[item.id]})`;
           }
-          message += `${orderLine}\n`;
+          message += `• ${orderLine}\n`;
         });
         message += '\n';
       }
     });
 
     if (notes.trim()) {
-      message += `NAPOMENE:\n${notes}\n`;
+      message += `📝 NAPOMENE:\n`;
+      message += `${'─'.repeat(30)}\n`;
+      message += `${notes}\n\n`;
     }
+
+    message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `Ukupno stavki: ${getTotalItems()}\n`;
+    message += `Vreme kreiranja: ${new Date().toLocaleString('sr-RS')}`;
 
     return message;
   };
 
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(generateOrder());
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      alert('Greška pri kopiranju');
+    }
+  };
+
+  const filteredItems = searchTerm ? 
+    items.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase())) :
+    items;
+
+  const filteredGroupedItems = filteredItems.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {});
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
         <div className="text-center">
-          <div className="text-2xl mb-4">⏳</div>
-          <p className="text-gray-500">Učitavam artikle...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Učitavam artikle...</p>
         </div>
       </div>
     );
   }
 
+  // Ako je izabrana kategorija, prikaži artikle te kategorije
+  if (selectedCategory) {
+    const categoryItems = searchTerm ? 
+      filteredGroupedItems[selectedCategory] || [] :
+      groupedItems[selectedCategory] || [];
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        {/* Header sa back dugmetom */}
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm shadow-lg border-b border-gray-200">
+          <div className="max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="flex items-center gap-3 flex-1">
+                {getCategoryIcon(selectedCategory)}
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800">
+                  {selectedCategory}
+                </h1>
+                <span className="bg-gray-100 px-2 py-1 rounded-full text-xs font-medium text-gray-600">
+                  {categoryItems.length}
+                </span>
+              </div>
+              
+              {getTotalItems() > 0 && (
+                <button
+                  onClick={() => setShowOrderSummary(true)}
+                  className="bg-green-500 hover:bg-green-600 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium text-white flex items-center gap-2 transition-all shadow-lg"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                    {getTotalItems()}
+                  </span>
+                </button>
+              )}
+            </div>
+            
+            {/* Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`Pretraži u kategoriji ${selectedCategory}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all text-sm bg-white/80 backdrop-blur-sm"
+              />
+              <Search className="absolute left-3 top-3.5 text-gray-400 h-5 w-5" />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Artikli u kategoriji */}
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 space-y-3">
+          {categoryItems.map(item => (
+            <div key={item.id} className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border border-gray-200 hover:bg-white transition-all shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-800 text-sm sm:text-base mb-2">
+                    {item.name}
+                  </div>
+                  {item.variants?.length > 0 && (
+                    <select
+                      value={variants[item.id] || ''}
+                      onChange={(e) => updateVariant(item.id, e.target.value)}
+                      className="text-sm bg-white border border-gray-200 rounded-lg p-2 w-full max-w-48"
+                    >
+                      <option value="">Izaberi varijantu</option>
+                      {item.variants.map(variant => (
+                        <option key={variant} value={variant}>{variant}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {orders[item.id] > 0 && (
+                    <button
+                      onClick={() => updateOrder(item, (orders[item.id] || 0) - 1)}
+                      className="h-10 w-10 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-all shadow-md active:scale-95"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                  )}
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={orders[item.id] || ''}
+                    onChange={(e) => updateOrder(item, parseFloat(e.target.value) || 0)}
+                    className="w-16 sm:w-20 text-center rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 p-2 text-sm bg-white"
+                    placeholder="0"
+                  />
+                  <span className="text-sm text-gray-500 w-8 text-center">
+                    {item.unit}
+                  </span>
+                  <button
+                    onClick={() => updateOrder(item, (orders[item.id] || 0) + 1)}
+                    className="h-10 w-10 flex items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600 transition-all shadow-md active:scale-95"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {categoryItems.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Nema artikala u ovoj kategoriji</p>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="mt-2 text-blue-500 hover:text-blue-600"
+                >
+                  Obriši pretragu
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Floating back button - mobile */}
+        <div className="sm:hidden fixed bottom-4 left-4 z-30">
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className="bg-gray-600 hover:bg-gray-700 text-white p-3 rounded-full shadow-xl transition-all"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Floating cart button - mobile */}
+        {getTotalItems() > 0 && (
+          <div className="sm:hidden fixed bottom-4 right-4 z-30">
+            <button
+              onClick={() => setShowOrderSummary(true)}
+              className="bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-xl flex items-center justify-center relative"
+            >
+              <ShoppingCart className="h-6 w-6" />
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                {getTotalItems()}
+              </span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Glavni ekran sa kategorijama
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl shadow-lg">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">🍷 Trebovanje pića</h1>
-            <div className="flex gap-2">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      {/* Header */}
+      <div className="bg-white/95 backdrop-blur-sm shadow-lg border-b border-gray-200">
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
+                <Wine className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Trebovanje pića
+                </h1>
+                <p className="text-xs text-gray-500">
+                  {categoryOrder.filter(cat => groupedItems[cat]?.length > 0).length} kategorija • {items.length} artikala
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 w-full sm:w-auto">
+              {getTotalItems() > 0 && (
+                <button
+                  onClick={() => setShowOrderSummary(true)}
+                  className="flex-1 sm:flex-none bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-2 transition-all shadow-lg"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span className="hidden sm:inline">Pregled</span>
+                  <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                    {getTotalItems()}
+                  </span>
+                </button>
+              )}
               <button
                 onClick={() => setShowAddModal(true)}
-                className="bg-green-500 hover:bg-green-600 px-3 py-2 rounded-lg text-sm flex items-center gap-1"
+                className="flex-1 sm:flex-none bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-2 transition-all shadow-lg"
               >
                 <Plus className="w-4 h-4" />
-                Dodaj
+                <span className="hidden sm:inline">Dodaj</span>
               </button>
               <button
                 onClick={() => setShowManageModal(true)}
-                className="bg-gray-500 hover:bg-gray-600 px-3 py-2 rounded-lg text-sm flex items-center gap-1"
+                className="flex-1 sm:flex-none bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-2 transition-all shadow-lg"
               >
                 <Settings className="w-4 h-4" />
-                Upravljaj
+                <span className="hidden sm:inline">Upravljaj</span>
               </button>
             </div>
           </div>
           
           {/* Search */}
-          <div className="relative">
+          <div className="relative mt-4">
             <input
               type="text"
-              placeholder="Pretraži pića..."
+              placeholder="Pretraži sve artikle..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full p-3 pl-10 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all text-sm bg-white/80 backdrop-blur-sm"
             />
             <Search className="absolute left-3 top-3.5 text-gray-400 h-5 w-5" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-b-2xl shadow-xl p-6 space-y-6">
-          {/* Kategorije */}
-          {Object.entries(filteredGroupedItems)
-  .sort(([a], [b]) => {
-    const categoryOrder = [
-      'TOPLI NAPICI',
-      'BEZALKOHOLNA PIĆA', 
-      'CEDEVITA I ENERGETSKA PIĆA',
-      'NEXT SOKOVI',
-      'PIVA',
-      'SOMERSBY',
-      'ŽESTOKA PIĆA',
-      'VISKI',
-      'BRENDI I KONJACI',
-      'LIKERI',
-      'DOMAĆA ALKOHOLNA PIĆA',
-      'BELA VINA',
-      'CRVENA VINA',
-      'ROZE VINA',
-      'VINA 0,187L'
-    ];
-    
-    const indexA = categoryOrder.indexOf(a);
-    const indexB = categoryOrder.indexOf(b);
-    
-    if (indexA === -1) return 1;
-    if (indexB === -1) return -1;
-    
-    return indexA - indexB;
-  })
-  .map(([category, categoryItems]) => (
-            <div key={category} className="border-2 border-gray-100 rounded-xl p-4 hover:border-blue-200 transition-all">
-              <div className="flex items-center gap-3 mb-4">
-                {getCategoryIcon(category)}
-                <h2 className="font-bold text-lg text-gray-800">{category}</h2>
-                <span className="text-sm text-gray-500">({categoryItems.length})</span>
-              </div>
-              
-              <div className="space-y-3">
-                {categoryItems.map(item => (
-                  <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all">
-                    <div className="flex-1 space-y-1">
-                      <div className="font-medium text-gray-800">{item.name}</div>
-                      {item.variants?.length > 0 && (
-                        <select
-                          value={variants[item.id] || ''}
-                          onChange={(e) => updateVariant(item.id, e.target.value)}
-                          className="text-sm text-gray-600 border rounded p-1"
-                        >
-                          <option value="">Izaberi varijantu</option>
-                          {item.variants.map(variant => (
-                            <option key={variant} value={variant}>{variant}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      {orders[item.id] > 0 && (
-                        <button
-                          onClick={() => updateOrder(item, (orders[item.id] || 0) - 1)}
-                          className="h-8 w-8 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-all"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                      )}
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={orders[item.id] || ''}
-                        onChange={(e) => updateOrder(item, parseFloat(e.target.value) || 0)}
-                        className="w-16 text-center rounded border-2 border-gray-200 focus:border-blue-500 p-1"
-                        placeholder="0"
-                      />
-                      <span className="text-xs text-gray-500 w-8">{item.unit}</span>
-                      <button
-                        onClick={() => updateOrder(item, (orders[item.id] || 0) + 1)}
-                        className="h-8 w-8 flex items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600 transition-all"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {/* Napomene */}
-          <div className="border-2 border-gray-100 rounded-xl p-4">
-            <h2 className="font-bold mb-3 text-lg text-gray-800">📝 Napomene</h2>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full h-20 p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              placeholder="Dodatne napomene..."
-            />
-          </div>
-
-          {/* Akcije */}
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(generateOrder());
-                alert('Trebovanje kopirano!');
-              }}
-              className="flex-1 bg-blue-500 text-white rounded-xl px-4 py-3 hover:bg-blue-600 transition-all flex items-center justify-center gap-2 font-medium"
-              disabled={Object.keys(orders).length === 0}
-            >
-              <Copy className="h-4 w-4" />
-              Kopiraj
-            </button>
-            
-            <button
-              onClick={() => {
-                const order = generateOrder();
-                const encodedOrder = encodeURIComponent(order);
-                window.open(`https://wa.me/?text=${encodedOrder}`);
-              }}
-              className="flex-1 bg-green-500 text-white rounded-xl px-4 py-3 hover:bg-green-600 transition-all flex items-center justify-center gap-2 font-medium"
-              disabled={Object.keys(orders).length === 0}
-            >
-              <Send className="h-4 w-4" />
-              WhatsApp
-            </button>
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Kategorije kao kartice */}
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-6">
+        {searchTerm ? (
+          /* Rezultati pretrage */
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              Rezultati pretrage za "{searchTerm}"
+            </h2>
+            {Object.entries(filteredGroupedItems).map(([category, categoryItems]) => (
+              <div key={category} className={`bg-gradient-to-r ${getCategoryColor(category)} rounded-xl border-2 p-4 shadow-lg`}>
+                <div className="flex items-center gap-3 mb-3">
+                  {getCategoryIcon(category)}
+                  <h3 className="font-bold text-gray-800">{category}</h3>
+                  <span className="bg-white/60 px-2 py-1 rounded-full text-xs font-medium">
+                    {categoryItems.length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {categoryItems.slice(0, 3).map(item => (
+                    <div key={item.id} className="bg-white/80 rounded-lg p-3 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{item.name}</span>
+                        <button
+                          onClick={() => {
+                            setSelectedCategory(category);
+                            setSearchTerm('');
+                          }}
+                          className="text-blue-500 hover:text-blue-700 text-xs"
+                        >
+                          Otvori
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {categoryItems.length > 3 && (
+                    <button
+                      onClick={() => {
+                        setSelectedCategory(category);
+                        setSearchTerm('');
+                      }}
+                      className="w-full bg-white/60 hover:bg-white/80 rounded-lg p-2 text-sm text-gray-600 transition-all"
+                    >
+                      +{categoryItems.length - 3} još artikala...
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Kategorije grid */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {categoryOrder.map(category => {
+              const categoryItems = groupedItems[category] || [];
+              if (categoryItems.length === 0) return null;
+              
+              const orderedItemsInCategory = categoryItems.filter(item => orders[item.id]).length;
+              
+              return (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`bg-gradient-to-br ${getCategoryColor(category)} rounded-xl border-2 p-4 sm:p-6 text-left hover:shadow-lg transition-all duration-200 relative group`}
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    {getCategoryIcon(category)}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-800 text-sm sm:text-base leading-tight mb-1">
+                        {category}
+                      </h3>
+                      <p className="text-xs text-gray-600">
+                        {categoryItems.length} artikala
+                      </p>
+                    </div>
+                    {orderedItemsInCategory > 0 && (
+                      <div className="bg-green-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                        {orderedItemsInCategory}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Klikni za pregled artikala
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Napomene */}
+        <div className="mt-8 bg-white/80 backdrop-blur-sm rounded-xl border-2 border-gray-200 overflow-hidden shadow-lg">
+          <div className="p-4 sm:p-6">
+            <h2 className="font-bold mb-4 text-sm sm:text-lg text-gray-800 flex items-center gap-2">
+              📝 Napomene za trebovanje
+            </h2>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full h-20 sm:h-24 p-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all text-sm resize-none bg-white/90"
+              placeholder="Dodatne napomene koje će biti uključene u trebovanje..."
+            />
+          </div>
+        </div>
+
+        {/* Quick copy section */}
+        {getTotalItems() > 0 && (
+          <div className="mt-6 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              <div>
+                <h3 className="font-bold text-gray-800 mb-1">Trebovanje spremno!</h3>
+                <p className="text-sm text-gray-600">{getTotalItems()} stavki u trebovanju</p>
+              </div>
+              
+              <div className="flex gap-2 w-full sm:w-auto">
+                <button
+                  onClick={copyToClipboard}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
+                    copySuccess 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                  }`}
+                >
+                  {copySuccess ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Kopirano!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Kopiraj tekst
+                    </>
+                  )}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    const order = generateOrder();
+                    const encodedOrder = encodeURIComponent(order);
+                    window.open(`https://wa.me/?text=${encodedOrder}`);
+                  }}
+                  className="flex-1 sm:flex-none bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 transition-all"
+                >
+                  <Send className="h-4 w-4" />
+                  WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Floating cart button - samo mobile na glavnom ekranu */}
+      {getTotalItems() > 0 && (
+        <div className="sm:hidden fixed bottom-4 right-4 z-30">
+          <button
+            onClick={() => setShowOrderSummary(true)}
+            className="bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-xl flex items-center justify-center relative"
+          >
+            <ShoppingCart className="h-6 w-6" />
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+              {getTotalItems()}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Order Summary Modal */}
+      <OrderSummaryModal 
+        show={showOrderSummary} 
+        onClose={() => setShowOrderSummary(false)}
+        orders={orders}
+        variants={variants}
+        items={items}
+        notes={notes}
+        generateOrder={generateOrder}
+        copyToClipboard={copyToClipboard}
+        copySuccess={copySuccess}
+      />
 
       {/* Add Modal */}
       <AddItemModal 
@@ -345,6 +616,100 @@ export default function TrebovanjeApp() {
         onClose={() => setShowManageModal(false)}
         items={items}
       />
+    </div>
+  );
+}
+
+// Order Summary Modal
+function OrderSummaryModal({ show, onClose, orders, variants, items, notes, generateOrder, copyToClipboard, copySuccess }) {
+  if (!show) return null;
+
+  const orderedItems = items.filter(item => orders[item.id]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="p-4 border-b bg-gradient-to-r from-green-500 to-blue-500 text-white">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold">🛒 Pregled trebovanja</h2>
+            <button onClick={onClose} className="text-white/80 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 overflow-y-auto max-h-96">
+          {orderedItems.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">Nema stavki u trebovanju</p>
+          ) : (
+            <div className="space-y-3">
+              {orderedItems.map(item => (
+                <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{item.name}</div>
+                    {variants[item.id] && (
+                      <div className="text-xs text-gray-500">({variants[item.id]})</div>
+                    )}
+                  </div>
+                  <div className="font-bold text-green-600">
+                    {orders[item.id]} {item.unit}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {notes && (
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <div className="font-medium text-sm text-blue-800 mb-1">Napomene:</div>
+              <div className="text-sm text-blue-700">{notes}</div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t bg-gray-50">
+          <div className="text-center mb-3">
+            <p className="text-sm text-gray-600">Ukupno stavki: {orderedItems.length}</p>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={copyToClipboard}
+              className={`flex-1 py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
+                copySuccess 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+              disabled={orderedItems.length === 0}
+            >
+              {copySuccess ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Kopirano!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Kopiraj
+                </>
+              )}
+            </button>
+            
+            <button
+              onClick={() => {
+                const order = generateOrder();
+                const encodedOrder = encodeURIComponent(order);
+                window.open(`https://wa.me/?text=${encodedOrder}`);
+              }}
+              className="flex-1 bg-green-500 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-green-600 transition-all"
+              disabled={orderedItems.length === 0}
+            >
+              <Send className="h-4 w-4" />
+              WhatsApp
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -373,7 +738,7 @@ function AddItemModal({ show, onClose, categories }) {
         variants: formData.variants ? formData.variants.split(',').map(v => v.trim()) : []
       };
 
-      await saveItemToFirebase(itemData);
+      await saveItemToDatabase(itemData);
       alert('Stavka je dodana!');
       setFormData({ name: '', category: '', newCategory: '', unit: 'kom', variants: '' });
       onClose();
@@ -387,29 +752,36 @@ function AddItemModal({ show, onClose, categories }) {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">➕ Dodaj novi artikal</h2>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="p-4 border-b bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold">➕ Dodaj novi artikal</h2>
+            <button onClick={onClose} className="text-white/80 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
-            <label className="block mb-2 font-medium">Naziv artikla:</label>
+            <label className="block mb-2 font-medium text-sm">Naziv artikla:</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-200"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all text-sm"
               placeholder="Naziv artikla"
               required
             />
           </div>
 
           <div>
-            <label className="block mb-2 font-medium">Kategorija:</label>
+            <label className="block mb-2 font-medium text-sm">Kategorija:</label>
             <select
               value={formData.category}
               onChange={(e) => setFormData({...formData, category: e.target.value})}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-200"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all text-sm"
             >
               <option value="">Izaberi postojeću kategoriju</option>
               {categories.map(cat => (
@@ -421,17 +793,17 @@ function AddItemModal({ show, onClose, categories }) {
               type="text"
               value={formData.newCategory}
               onChange={(e) => setFormData({...formData, newCategory: e.target.value})}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-200 mt-2"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all mt-2 text-sm"
               placeholder="Ili unesite novu kategoriju"
             />
           </div>
 
           <div>
-            <label className="block mb-2 font-medium">Jedinica mere:</label>
+            <label className="block mb-2 font-medium text-sm">Jedinica mere:</label>
             <select
               value={formData.unit}
               onChange={(e) => setFormData({...formData, unit: e.target.value})}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-200"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all text-sm"
             >
               <option value="kom">kom</option>
               <option value="ml">ml</option>
@@ -442,12 +814,12 @@ function AddItemModal({ show, onClose, categories }) {
           </div>
 
           <div>
-            <label className="block mb-2 font-medium">Varijante (opciono):</label>
+            <label className="block mb-2 font-medium text-sm">Varijante (opciono):</label>
             <input
               type="text"
               value={formData.variants}
               onChange={(e) => setFormData({...formData, variants: e.target.value})}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-200"
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all text-sm"
               placeholder="Nana, Kamilica, Zeleni (odvojeno zarezima)"
             />
           </div>
@@ -456,14 +828,14 @@ function AddItemModal({ show, onClose, categories }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-500 text-white p-3 rounded-lg hover:bg-gray-600"
+              className="flex-1 bg-gray-500 text-white py-3 rounded-xl hover:bg-gray-600 transition-all text-sm font-medium"
             >
               Otkaži
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 disabled:bg-blue-300"
+              className="flex-1 bg-blue-500 text-white py-3 rounded-xl hover:bg-blue-600 disabled:bg-blue-300 transition-all text-sm font-medium"
             >
               {saving ? 'Čuvam...' : 'Dodaj'}
             </button>
@@ -489,7 +861,7 @@ function ManageItemsModal({ show, onClose, items }) {
     
     setDeleting(itemId);
     try {
-      await deleteItemFromFirebase(itemId);
+      await deleteItemFromDatabase(itemId);
       alert('Stavka je obrisana!');
     } catch (error) {
       alert('Greška pri brisanju: ' + error.message);
@@ -501,43 +873,54 @@ function ManageItemsModal({ show, onClose, items }) {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-96 overflow-hidden">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">🛠️ Upravljaj artiklima</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="p-4 border-b bg-gradient-to-r from-gray-500 to-slate-600 text-white">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold">🛠️ Upravljaj artiklima</h2>
+            <button onClick={onClose} className="text-white/80 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Pretraži artikle..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-200"
-          />
-        </div>
+        <div className="p-4">
+          <div className="relative mb-4">
+            <input
+              type="text"
+              placeholder="Pretraži artikle..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all text-sm"
+            />
+            <Search className="absolute left-3 top-3.5 text-gray-400 h-5 w-5" />
+          </div>
 
-        <div className="overflow-y-auto max-h-64 space-y-2">
-          {filteredItems.map(item => (
-            <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-              <div>
-                <div className="font-medium">{item.name}</div>
-                <div className="text-sm text-gray-500">{item.category} • {item.unit}</div>
+          <div className="overflow-y-auto max-h-96 space-y-2">
+            {filteredItems.map(item => (
+              <div key={item.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sm truncate">{item.name}</div>
+                  <div className="text-xs text-gray-500">{item.category} • {item.unit}</div>
+                </div>
+                <button
+                  onClick={() => handleDelete(item.id, item.name)}
+                  disabled={deleting === item.id}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-xs disabled:bg-red-300 transition-all flex items-center gap-2"
+                >
+                  {deleting === item.id ? (
+                    <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Trash2 className="w-3 h-3" />
+                  )}
+                </button>
               </div>
-              <button
-                onClick={() => handleDelete(item.id, item.name)}
-                disabled={deleting === item.id}
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm disabled:bg-red-300"
-              >
-                {deleting === item.id ? '...' : <Trash2 className="w-4 h-4" />}
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        <div className="mt-4 text-sm text-gray-500">
-          Ukupno: {items.length} artikala
+          <div className="mt-4 text-xs text-gray-500 text-center">
+            Prikazano: {filteredItems.length} / {items.length} artikala
+          </div>
         </div>
       </div>
     </div>
