@@ -17,7 +17,8 @@ const categoryOrder = [
   'BELA VINA',
   'CRVENA VINA',
   'ROZE VINA',
-  'VINA 0,187L'
+  'VINA 0,187L',
+  'BAZEN'
 ];
 
 // Tačan redosled artikala
@@ -194,10 +195,53 @@ let items = [
   // VINA 0,187L
   { id: 123, name: 'RUBIN CHARDONNAY 0,187', category: 'VINA 0,187L', unit: 'kom', variants: [] },
   { id: 124, name: 'RUBIN VRANAC 0,187', category: 'VINA 0,187L', unit: 'kom', variants: [] },
-  { id: 125, name: 'RUBIN ROSE 0,187', category: 'VINA 0,187L', unit: 'kom', variants: [] }
+  { id: 125, name: 'RUBIN ROSE 0,187', category: 'VINA 0,187L', unit: 'kom', variants: [] },
+
+  // BAZEN
+  { id: 126, name: 'NEXT LEMON MINT 0.4', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 127, name: 'NEXT BRESKVA TTP', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 128, name: 'NEXT LEMONADA BERRY 0.4', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 129, name: 'NEXT JOY MULTIVITAMIN 0.5', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 130, name: 'BTER 0.3 LIMEIKA', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 131, name: 'SOMERSBY JABUKA 0.3 LIM', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 132, name: 'TOČENO PIVO 0.5', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 133, name: 'FUZE TEA FOREST FRUIT', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 134, name: 'NEXT JOY VIŠNJA 0.5', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 135, name: 'NEXT JABUKA TTP', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 136, name: 'NEXT NARANDŽA TTP', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 137, name: 'COCA COLA 0.3 LIMEIKA', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 138, name: 'NEXT ZERO LEMON JAGODA 0.4', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 139, name: 'ROSA GAZIRANA PVC', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 140, name: 'FUZE TEA LEMON 0.5', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 141, name: 'VOTKA BAZEN', category: 'BAZEN', unit: 'ml', variants: [] },
+  { id: 142, name: 'SOMERSBY MANDARINA 0.3 LIM', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 143, name: 'COCA COLA ZERO 0.3 LIMEIKA', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 144, name: 'NEXT JOY NARANDŽA 0.5', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 145, name: 'FUZE TEA PEACH HIBISKUS', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 146, name: 'NEXT MULTIVITAMIN TTP', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 147, name: 'TONIK LIMEIKA 0.33', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 148, name: 'CARLSBERG', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 149, name: 'SPRITE 0.3 LIMEIKA', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 150, name: 'PELINKOVAC 0.3 BAZEN', category: 'BAZEN', unit: 'ml', variants: [] },
+  { id: 151, name: 'ROSA NEGAZIRANA PVC', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 152, name: 'SOMERSBY JAGODA 0.3 LIM', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 153, name: 'RADLER ANANAS', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 154, name: 'ULTRA ENERGY LIM', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 155, name: 'RADLER MOJITO', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 156, name: 'RADLER LIMUN', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 157, name: 'TOČENI SOMERSBY MANGO 0.25', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 158, name: 'SOMERSBY BOROVNICA 0.3 LIM', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 159, name: 'TUBORG', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 160, name: 'LAV PREMIUM', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 161, name: 'COCA COLA LIMETA 0.3', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 162, name: 'DŽIN BAZEN', category: 'BAZEN', unit: 'ml', variants: [] },
+  { id: 163, name: 'LIMUNADA DOMAĆA', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 164, name: 'FANTA 0.3 LIMEIKA', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 165, name: 'NEXT LEMON ZERO ANANAS 0.4', category: 'BAZEN', unit: 'kom', variants: [] },
+  { id: 166, name: 'NEXT LEMONADE LEMON 0.4', category: 'BAZEN', unit: 'kom', variants: [] }
 ];
 
-let nextId = 126;
+let nextId = 167;
 
 // Funkcija za sortiranje po tačnom redosledu
 function sortItems(items) {
