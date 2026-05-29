@@ -9,6 +9,7 @@ import {
 import { CATEGORY_ORDER, getCategoryMeta } from '../utils/categories';
 import {
   generateOrderText,
+  buildOrderLines,
   copyText,
   shareWhatsApp,
   shareTelegram,
@@ -33,12 +34,15 @@ import {
   ArrowLeft, Moon, Sun, Monitor, History, Pencil, RotateCcw, Wine, Printer,
 } from 'lucide-react';
 
+// Brze količine (npr. transport/gajbe)
+const QUICK_AMOUNTS = [12, 24];
+
 /* ============================ Glavna komponenta ============================ */
 
 export default function TrebovanjeApp() {
   const [items, setItems] = useState([]);
-  const [orders, setOrders] = useState({});
-  const [variants, setVariants] = useState({});
+  const [orders, setOrders] = useState({});            // artikli bez varijanti: { id: qty }
+  const [variantOrders, setVariantOrders] = useState({}); // sa varijantama: { id: { vrsta: qty } }
   const [notes, setNotes] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -56,7 +60,7 @@ export default function TrebovanjeApp() {
 
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 2200);
+    setTimeout(() => setToast(null), 2600);
   }, []);
 
   /* ---- Učitavanje artikala + polling ---- */
@@ -98,7 +102,7 @@ export default function TrebovanjeApp() {
     const d = loadDraft();
     if (d) {
       setOrders(d.orders);
-      setVariants(d.variants);
+      setVariantOrders(d.variantOrders);
       setNotes(d.notes);
     }
     setHydrated(true);
@@ -106,8 +110,8 @@ export default function TrebovanjeApp() {
 
   useEffect(() => {
     if (!hydrated) return;
-    saveDraft(orders, variants, notes);
-  }, [orders, variants, notes, hydrated]);
+    saveDraft(orders, variantOrders, notes);
+  }, [orders, variantOrders, notes, hydrated]);
 
   /* ---- Grupisanje ---- */
   const groupedItems = items.reduce((acc, item) => {
@@ -129,35 +133,48 @@ export default function TrebovanjeApp() {
     return acc;
   }, {});
 
-  /* ---- Trebovanje (orders) ---- */
+  /* ---- Linije trebovanja (za broj/badge) ---- */
+  const orderLines = buildOrderLines(items, orders, variantOrders);
+  const totalItems = orderLines.length;
+  const orderedInCategory = (category) =>
+    orderLines.filter((l) => l.category === category).length;
+
+  /* ---- Izmena količina ---- */
   const updateOrder = (item, value) => {
     const quantity = parseFloat(parseFloat(value).toFixed(2));
     if (quantity > 0) {
       setOrders({ ...orders, [item.id]: quantity });
     } else {
-      const newOrders = { ...orders };
-      delete newOrders[item.id];
-      setVariants((prev) => {
-        const nv = { ...prev };
-        delete nv[item.id];
-        return nv;
-      });
-      setOrders(newOrders);
+      const next = { ...orders };
+      delete next[item.id];
+      setOrders(next);
     }
   };
 
-  const updateVariant = (itemId, variant) =>
-    setVariants({ ...variants, [itemId]: variant });
+  const updateVariantQty = (itemId, variant, value) => {
+    const quantity = parseFloat(parseFloat(value).toFixed(2));
+    setVariantOrders((prev) => {
+      const current = { ...(prev[itemId] || {}) };
+      if (quantity > 0) current[variant] = quantity;
+      else delete current[variant];
+      const next = { ...prev };
+      if (Object.keys(current).length) next[itemId] = current;
+      else delete next[itemId];
+      return next;
+    });
+  };
 
-  const totalItems = Object.keys(orders).length;
+  const resetOrder = () => {
+    setOrders({});
+    setVariantOrders({});
+    setNotes('');
+    clearDraft();
+  };
 
   const clearOrder = () => {
     if (totalItems === 0) return;
     if (!confirm('Obrisati celo trenutno trebovanje?')) return;
-    setOrders({});
-    setVariants({});
-    setNotes('');
-    clearDraft();
+    resetOrder();
     showToast('Trebovanje obrisano', 'info');
   };
 
@@ -165,7 +182,7 @@ export default function TrebovanjeApp() {
   const recordHistory = (text) => {
     const hist = loadHistory();
     if (hist[0] && hist[0].text === text) return; // izbegni duplikat
-    addToHistory({ text, count: totalItems, orders, variants, notes });
+    addToHistory({ text, count: totalItems, orders, variantOrders, notes });
   };
 
   const doShare = async (kind) => {
@@ -173,10 +190,14 @@ export default function TrebovanjeApp() {
       showToast('Trebovanje je prazno', 'error');
       return;
     }
-    const text = generateOrderText(items, orders, variants, notes);
+    const text = generateOrderText(items, orders, variantOrders, notes);
+
     if (kind === 'copy') {
       const ok = await copyText(text);
-      showToast(ok ? 'Kopirano u clipboard!' : 'Greška pri kopiranju', ok ? 'success' : 'error');
+      if (!ok) {
+        showToast('Greška pri kopiranju', 'error');
+        return;
+      }
     } else if (kind === 'whatsapp') {
       shareWhatsApp(text);
     } else if (kind === 'telegram') {
@@ -184,15 +205,26 @@ export default function TrebovanjeApp() {
     } else if (kind === 'viber') {
       shareViber(text);
     } else if (kind === 'native') {
-      await shareNative(text);
+      const ok = await shareNative(text);
+      if (!ok) return; // korisnik otkazao / nije podržano — ne resetuj
     }
+
+    // Sačuvaj u istoriju i automatski resetuj trebovanje
     recordHistory(text);
+    resetOrder();
+    setShowOrderSummary(false);
+    showToast(
+      kind === 'copy'
+        ? 'Kopirano! Sačuvano u istoriju, trebovanje resetovano.'
+        : 'Poslato! Sačuvano u istoriju, trebovanje resetovano.',
+      'success'
+    );
   };
 
   /* ---- Učitavanje iz istorije ---- */
   const loadFromHistory = (entry) => {
     setOrders(entry.orders || {});
-    setVariants(entry.variants || {});
+    setVariantOrders(entry.variantOrders || {});
     setNotes(entry.notes || '');
     setShowHistory(false);
     setSelectedCategory(null);
@@ -221,6 +253,15 @@ export default function TrebovanjeApp() {
           : <Moon className="w-5 h-5" />}
       </IconButton>
     </div>
+  );
+
+  const modals = (
+    <Modals
+      {...{ showOrderSummary, setShowOrderSummary, showAddModal, setShowAddModal,
+        showManageModal, setShowManageModal, showHistory, setShowHistory,
+        editItem, setEditItem, orders, variantOrders, items, notes, doShare,
+        allCategories, refresh, showToast, loadFromHistory }}
+    />
   );
 
   /* =================== Ekran: detalji kategorije =================== */
@@ -261,9 +302,9 @@ export default function TrebovanjeApp() {
               key={item.id}
               item={item}
               qty={orders[item.id]}
-              variant={variants[item.id]}
+              variantQtys={variantOrders[item.id]}
               onQty={(v) => updateOrder(item, v)}
-              onVariant={(v) => updateVariant(item.id, v)}
+              onVariantQty={(variant, v) => updateVariantQty(item.id, variant, v)}
             />
           ))}
           {categoryItems.length === 0 && (
@@ -275,12 +316,7 @@ export default function TrebovanjeApp() {
         </main>
 
         <CartBar total={totalItems} onOpen={() => setShowOrderSummary(true)} />
-        <Modals
-          {...{ showOrderSummary, setShowOrderSummary, showAddModal, setShowAddModal,
-            showManageModal, setShowManageModal, showHistory, setShowHistory,
-            editItem, setEditItem, orders, variants, items, notes, doShare,
-            allCategories, refresh, showToast, loadFromHistory }}
-        />
+        {modals}
       </Shell>
     );
   }
@@ -374,7 +410,7 @@ export default function TrebovanjeApp() {
               const catItems = groupedItems[category] || [];
               if (catItems.length === 0) return null;
               const meta = getCategoryMeta(category);
-              const orderedCount = catItems.filter((i) => orders[i.id]).length;
+              const orderedCount = orderedInCategory(category);
               return (
                 <button
                   key={category}
@@ -414,12 +450,7 @@ export default function TrebovanjeApp() {
       </main>
 
       <CartBar total={totalItems} onOpen={() => setShowOrderSummary(true)} />
-      <Modals
-        {...{ showOrderSummary, setShowOrderSummary, showAddModal, setShowAddModal,
-          showManageModal, setShowManageModal, showHistory, setShowHistory,
-          editItem, setEditItem, orders, variants, items, notes, doShare,
-          allCategories, refresh, showToast, loadFromHistory }}
-      />
+      {modals}
     </Shell>
   );
 }
@@ -432,7 +463,7 @@ function Shell({ children, toast }) {
       {children}
       {toast && (
         <div className="fixed top-4 inset-x-0 z-[60] flex justify-center px-4 pointer-events-none">
-          <div className={`px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium text-white ${
+          <div className={`px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium text-white text-center ${
             toast.type === 'error' ? 'bg-red-600' : toast.type === 'success' ? 'bg-emerald-600' : 'bg-slate-800 dark:bg-slate-700'
           }`}>
             {toast.message}
@@ -480,29 +511,79 @@ function SearchInput({ value, onChange, placeholder }) {
   );
 }
 
-function ItemRow({ item, qty, variant, onQty, onVariant }) {
-  const active = qty > 0;
+// Brojač +/- sa unosom količine
+function Stepper({ value, unit, onChange, size = 'md' }) {
+  const active = value > 0;
+  const btn = size === 'sm' ? 'h-9 w-9' : 'h-10 w-10';
   return (
-    <div className={`rounded-2xl border bg-white dark:bg-slate-900 p-3 transition ${
-      active ? 'border-sky-400 dark:border-sky-600 ring-1 ring-sky-500/20' : 'border-slate-200 dark:border-slate-800'
-    }`}>
+    <div className="flex items-center gap-1.5 shrink-0">
+      <button
+        onClick={() => onChange((value || 0) - 1)}
+        disabled={!active}
+        className={`${btn} grid place-items-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition active:scale-95`}
+        aria-label="Smanji"
+      >
+        <Minus className="h-4 w-4" />
+      </button>
+      <input
+        type="number"
+        inputMode="decimal"
+        step="0.01"
+        min="0"
+        value={value || ''}
+        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        className="w-14 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 outline-none p-2 text-sm"
+        placeholder="0"
+      />
+      <span className="text-xs text-slate-400 w-7 text-center">{unit}</span>
+      <button
+        onClick={() => onChange((value || 0) + 1)}
+        className={`${btn} grid place-items-center rounded-full bg-sky-600 text-white hover:bg-sky-700 transition active:scale-95 shadow-sm`}
+        aria-label="Povećaj"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function ItemRow({ item, qty, variantQtys, onQty, onVariantQty }) {
+  const hasVariants = item.variants?.length > 0;
+  const vq = variantQtys || {};
+  const active = hasVariants ? Object.values(vq).some((q) => q > 0) : qty > 0;
+
+  const cardCls = `rounded-2xl border bg-white dark:bg-slate-900 p-3 transition ${
+    active ? 'border-sky-400 dark:border-sky-600 ring-1 ring-sky-500/20' : 'border-slate-200 dark:border-slate-800'
+  }`;
+
+  if (hasVariants) {
+    return (
+      <div className={cardCls}>
+        <div className="font-medium text-sm mb-2">{item.name}</div>
+        <div className="space-y-2">
+          {item.variants.map((variant) => (
+            <div key={variant} className="flex items-center gap-2">
+              <span className="flex-1 min-w-0 text-sm text-slate-600 dark:text-slate-300 truncate">{variant}</span>
+              <Stepper
+                value={vq[variant]}
+                unit={item.unit}
+                onChange={(v) => onVariantQty(variant, v)}
+                size="sm"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cardCls}>
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm">{item.name}</div>
-          {item.variants?.length > 0 && (
-            <select
-              value={variant || ''}
-              onChange={(e) => onVariant(e.target.value)}
-              className="mt-2 text-sm bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg p-2 w-full max-w-56 outline-none focus:border-sky-400"
-            >
-              <option value="">Izaberi varijantu</option>
-              {item.variants.map((v) => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
-          )}
           <div className="mt-2 flex gap-1.5">
-            {[5, 10].map((n) => (
+            {QUICK_AMOUNTS.map((n) => (
               <button
                 key={n}
                 onClick={() => onQty((qty || 0) + n)}
@@ -513,34 +594,7 @@ function ItemRow({ item, qty, variant, onQty, onVariant }) {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => onQty((qty || 0) - 1)}
-            disabled={!active}
-            className="h-10 w-10 grid place-items-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition active:scale-95"
-            aria-label="Smanji"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0"
-            value={qty || ''}
-            onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
-            className="w-14 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 outline-none p-2 text-sm"
-            placeholder="0"
-          />
-          <span className="text-xs text-slate-400 w-7 text-center">{item.unit}</span>
-          <button
-            onClick={() => onQty((qty || 0) + 1)}
-            className="h-10 w-10 grid place-items-center rounded-full bg-sky-600 text-white hover:bg-sky-700 transition active:scale-95 shadow-sm"
-            aria-label="Povećaj"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
+        <Stepper value={qty} unit={item.unit} onChange={onQty} />
       </div>
     </div>
   );
@@ -621,7 +675,7 @@ function Modals(props) {
   const {
     showOrderSummary, setShowOrderSummary, showAddModal, setShowAddModal,
     showManageModal, setShowManageModal, showHistory, setShowHistory,
-    editItem, setEditItem, orders, variants, items, notes, doShare,
+    editItem, setEditItem, orders, variantOrders, items, notes, doShare,
     allCategories, refresh, showToast, loadFromHistory,
   } = props;
 
@@ -631,7 +685,7 @@ function Modals(props) {
         show={showOrderSummary}
         onClose={() => setShowOrderSummary(false)}
         orders={orders}
-        variants={variants}
+        variantOrders={variantOrders}
         items={items}
         notes={notes}
         doShare={doShare}
@@ -655,7 +709,6 @@ function Modals(props) {
       <HistoryModal
         show={showHistory}
         onClose={() => setShowHistory(false)}
-        doShare={doShare}
         onLoad={loadFromHistory}
         showToast={showToast}
       />
@@ -681,27 +734,27 @@ function ModalShell({ title, gradient, onClose, children, maxW = 'max-w-md' }) {
   );
 }
 
-function OrderSummaryModal({ show, onClose, orders, variants, items, notes, doShare }) {
+function OrderSummaryModal({ show, onClose, orders, variantOrders, items, notes, doShare }) {
   if (!show) return null;
-  const orderedItems = items.filter((item) => orders[item.id]);
+  const lines = buildOrderLines(items, orders, variantOrders);
 
   return (
     <ModalShell title="🛒 Pregled trebovanja" gradient="bg-emerald-600" onClose={onClose}>
       <div className="p-4 overflow-y-auto flex-1">
-        {orderedItems.length === 0 ? (
+        {lines.length === 0 ? (
           <p className="text-slate-500 dark:text-slate-400 text-center py-8">Nema stavki u trebovanju</p>
         ) : (
           <div className="space-y-2">
-            {orderedItems.map((item) => (
-              <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+            {lines.map((l) => (
+              <div key={l.key} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
                 <div className="min-w-0">
-                  <div className="font-medium text-sm">{item.name}</div>
-                  {variants[item.id] && (
-                    <div className="text-xs text-slate-500 dark:text-slate-400">({variants[item.id]})</div>
+                  <div className="font-medium text-sm">{l.name}</div>
+                  {l.variant && (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">({l.variant})</div>
                   )}
                 </div>
                 <div className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
-                  {orders[item.id]} {item.unit}
+                  {l.qty} {l.unit}
                 </div>
               </div>
             ))}
@@ -716,12 +769,12 @@ function OrderSummaryModal({ show, onClose, orders, variants, items, notes, doSh
       </div>
       <div className="p-4 border-t border-slate-200 dark:border-slate-800">
         <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-3">
-          Ukupno stavki: {orderedItems.length}
+          Ukupno stavki: {lines.length}
         </p>
-        <ShareButtons doShare={doShare} disabled={orderedItems.length === 0} />
+        <ShareButtons doShare={doShare} disabled={lines.length === 0} />
         <button
-          onClick={() => printOrder(items, orders, variants, notes)}
-          disabled={orderedItems.length === 0}
+          onClick={() => printOrder(items, orders, variantOrders, notes)}
+          disabled={lines.length === 0}
           className="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition"
         >
           <Printer className="h-4 w-4" /> Štampaj / Sačuvaj PDF
@@ -811,9 +864,12 @@ function ItemFormModal({ show, onClose, editItem, categories, refresh, showToast
           </select>
         </div>
         <div>
-          <label className="block mb-1.5 font-medium text-sm">Varijante (opciono)</label>
+          <label className="block mb-1.5 font-medium text-sm">Varijante / vrste (opciono)</label>
           <input type="text" value={form.variants} onChange={(e) => setForm({ ...form, variants: e.target.value })}
             className={inputCls} placeholder="Nana, Kamilica, Zeleni (zarezom)" />
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Ako uneseš vrste, moći ćeš da poručiš svaku vrstu posebno.
+          </p>
         </div>
         <div className="flex gap-2 pt-2">
           <button type="button" onClick={onClose}
@@ -889,7 +945,7 @@ function ManageItemsModal({ show, onClose, items, refresh, showToast, onEdit }) 
   );
 }
 
-function HistoryModal({ show, onClose, doShare, onLoad, showToast }) {
+function HistoryModal({ show, onClose, onLoad, showToast }) {
   const [history, setHistory] = useState([]);
   useEffect(() => {
     if (show) setHistory(loadHistory());
@@ -926,7 +982,7 @@ function HistoryModal({ show, onClose, doShare, onLoad, showToast }) {
                     className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium bg-sky-600 hover:bg-sky-700 text-white transition">
                     <RotateCcw className="w-3.5 h-3.5" /> Učitaj ponovo
                   </button>
-                  <button onClick={async () => { const ok = await copyTextEntry(entry.text); showToast(ok ? 'Kopirano!' : 'Greška', ok ? 'success' : 'error'); }}
+                  <button onClick={async () => { const ok = await copyText(entry.text); showToast(ok ? 'Kopirano!' : 'Greška', ok ? 'success' : 'error'); }}
                     className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition">
                     <Copy className="w-3.5 h-3.5" /> Kopiraj
                   </button>
@@ -942,9 +998,4 @@ function HistoryModal({ show, onClose, doShare, onLoad, showToast }) {
       </div>
     </ModalShell>
   );
-}
-
-// Pomoćno: kopiranje teksta iz istorije (reuse copyText iz share modula)
-async function copyTextEntry(text) {
-  return copyText(text);
 }

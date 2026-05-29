@@ -41,19 +41,21 @@ export function loadDraft() {
   }
   return {
     orders: draft.orders || {},
-    variants: draft.variants || {},
+    variantOrders: draft.variantOrders || {},
     notes: draft.notes || '',
   };
 }
 
-export function saveDraft(orders, variants, notes) {
+export function saveDraft(orders, variantOrders, notes) {
   const hasContent =
-    (orders && Object.keys(orders).length > 0) || (notes && notes.trim());
+    (orders && Object.keys(orders).length > 0) ||
+    (variantOrders && Object.keys(variantOrders).length > 0) ||
+    (notes && notes.trim());
   if (!hasContent) {
     clearDraft();
     return;
   }
-  writeJSON(DRAFT_KEY, { orders, variants, notes, savedAt: Date.now() });
+  writeJSON(DRAFT_KEY, { orders, variantOrders, notes, savedAt: Date.now() });
 }
 
 export function clearDraft() {
@@ -81,7 +83,7 @@ export function loadHistory() {
 }
 
 export function addToHistory(entry) {
-  // entry: { text, count, orders, variants, notes }
+  // entry: { text, count, orders, variantOrders, notes }
   const list = prune(readJSON(HISTORY_KEY));
   const record = {
     id: `h_${Date.now()}`,
@@ -89,7 +91,7 @@ export function addToHistory(entry) {
     text: entry.text,
     count: entry.count,
     orders: entry.orders || {},
-    variants: entry.variants || {},
+    variantOrders: entry.variantOrders || {},
     notes: entry.notes || '',
   };
   const next = [record, ...list].slice(0, HISTORY_LIMIT);

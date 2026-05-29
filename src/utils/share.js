@@ -1,56 +1,94 @@
 // src/utils/share.js
 // Generisanje lepo formatirane poruke trebovanja i deljenje na
 // WhatsApp / Telegram / Viber, plus kopiranje u clipboard.
+//
+// Model: artikli BEZ varijanti imaju količinu u `orders[id]`.
+// Artikli SA varijantama imaju količinu po vrsti u `variantOrders[id][varijanta]`,
+// pa se svaka vrsta prikazuje kao zasebna linija (npr. 1 Nana, 1 Kamilica...).
 
 import { CATEGORY_ORDER } from './categories';
 
-// Vraća poručene artikle grupisane po kategorijama, u pravilnom redosledu.
-export function groupOrderedByCategory(items, orders) {
-  const grouped = items.reduce((acc, item) => {
-    if (!orders[item.id]) return acc;
-    (acc[item.category] = acc[item.category] || []).push(item);
+// Pretvara trebovanje u ravnu listu linija (jedna linija = jedna stavka/vrsta).
+export function buildOrderLines(items, orders = {}, variantOrders = {}) {
+  const lines = [];
+  items.forEach((item) => {
+    if (item.variants?.length) {
+      const vo = variantOrders[item.id] || {};
+      item.variants.forEach((variant) => {
+        const qty = vo[variant];
+        if (qty > 0) {
+          lines.push({
+            key: `${item.id}__${variant}`,
+            category: item.category,
+            name: item.name,
+            variant,
+            qty,
+            unit: item.unit,
+          });
+        }
+      });
+    } else if (orders[item.id] > 0) {
+      lines.push({
+        key: `${item.id}`,
+        category: item.category,
+        name: item.name,
+        variant: null,
+        qty: orders[item.id],
+        unit: item.unit,
+      });
+    }
+  });
+  return lines;
+}
+
+// Grupiše linije po kategorijama u pravilnom redosledu.
+export function groupLinesByCategory(lines) {
+  const grouped = lines.reduce((acc, l) => {
+    (acc[l.category] = acc[l.category] || []).push(l);
     return acc;
   }, {});
-
   const known = CATEGORY_ORDER.filter((c) => grouped[c]);
   const extra = Object.keys(grouped)
     .filter((c) => !CATEGORY_ORDER.includes(c))
     .sort();
+  return [...known, ...extra].map((category) => ({ category, lines: grouped[category] }));
+}
 
-  return [...known, ...extra].map((category) => ({ category, items: grouped[category] }));
+// Ukupan broj stavki (linija) u trebovanju.
+export function countOrderLines(items, orders, variantOrders) {
+  return buildOrderLines(items, orders, variantOrders).length;
 }
 
 // Kreira čist, pregledan tekst trebovanja.
-export function generateOrderText(items, orders, variants, notes) {
+export function generateOrderText(items, orders, variantOrders, notes) {
   const date = new Date();
-  const groups = groupOrderedByCategory(items, orders);
+  const groups = groupLinesByCategory(buildOrderLines(items, orders, variantOrders));
 
   let total = 0;
-  const lines = [];
-  lines.push(`🍷 TREBOVANJE  —  ${date.toLocaleDateString('sr-RS')}`);
-  lines.push('');
+  const out = [];
+  out.push(`🍷 TREBOVANJE  —  ${date.toLocaleDateString('sr-RS')}`);
+  out.push('');
 
-  groups.forEach(({ category, items: catItems }) => {
-    lines.push(`▪️ ${category}`);
-    catItems.forEach((item) => {
+  groups.forEach(({ category, lines }) => {
+    out.push(`▪️ ${category}`);
+    lines.forEach((l) => {
       total += 1;
-      const qty = orders[item.id];
-      const variant = variants[item.id] ? ` (${variants[item.id]})` : '';
-      lines.push(`   • ${qty} ${item.unit} — ${item.name}${variant}`);
+      const variant = l.variant ? ` (${l.variant})` : '';
+      out.push(`   • ${l.qty} ${l.unit} — ${l.name}${variant}`);
     });
-    lines.push('');
+    out.push('');
   });
 
   if (notes && notes.trim()) {
-    lines.push('📝 Napomena:');
-    lines.push(`   ${notes.trim()}`);
-    lines.push('');
+    out.push('📝 Napomena:');
+    out.push(`   ${notes.trim()}`);
+    out.push('');
   }
 
-  lines.push(`Ukupno stavki: ${total}`);
-  lines.push(`Kreirano: ${date.toLocaleString('sr-RS')}`);
+  out.push(`Ukupno stavki: ${total}`);
+  out.push(`Kreirano: ${date.toLocaleString('sr-RS')}`);
 
-  return lines.join('\n');
+  return out.join('\n');
 }
 
 // Kopiranje u clipboard sa fallback-om za starije/nesigurne kontekste.
@@ -121,18 +159,18 @@ function esc(s) {
     .replace(/>/g, '&gt;');
 }
 
-function buildPrintHTML(items, orders, variants, notes) {
+function buildPrintHTML(items, orders, variantOrders, notes) {
   const date = new Date();
-  const groups = groupOrderedByCategory(items, orders);
+  const groups = groupLinesByCategory(buildOrderLines(items, orders, variantOrders));
   let total = 0;
 
   const sections = groups
-    .map(({ category, items: catItems }) => {
-      const rows = catItems
-        .map((item) => {
+    .map(({ category, lines }) => {
+      const rows = lines
+        .map((l) => {
           total += 1;
-          const variant = variants[item.id] ? ` <span class="v">(${esc(variants[item.id])})</span>` : '';
-          return `<tr><td class="q">${orders[item.id]} ${esc(item.unit)}</td><td>${esc(item.name)}${variant}</td></tr>`;
+          const variant = l.variant ? ` <span class="v">(${esc(l.variant)})</span>` : '';
+          return `<tr><td class="q">${l.qty} ${esc(l.unit)}</td><td>${esc(l.name)}${variant}</td></tr>`;
         })
         .join('');
       return `<h2>${esc(category)}</h2><table>${rows}</table>`;
@@ -171,8 +209,8 @@ function buildPrintHTML(items, orders, variants, notes) {
 }
 
 // Otvara štampu (može da se sačuva kao PDF) preko skrivenog iframe-a.
-export function printOrder(items, orders, variants, notes) {
-  const html = buildPrintHTML(items, orders, variants, notes);
+export function printOrder(items, orders, variantOrders, notes) {
+  const html = buildPrintHTML(items, orders, variantOrders, notes);
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
