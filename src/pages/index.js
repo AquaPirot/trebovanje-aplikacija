@@ -15,6 +15,7 @@ import {
   shareViber,
   shareNative,
   canShareNative,
+  printOrder,
 } from '../utils/share';
 import {
   loadDraft,
@@ -29,7 +30,7 @@ import {
 } from '../utils/localState';
 import {
   Search, Plus, Minus, Copy, Send, Settings, Trash2, X, ShoppingCart,
-  ArrowLeft, Moon, Sun, Monitor, History, Pencil, RotateCcw, Wine,
+  ArrowLeft, Moon, Sun, Monitor, History, Pencil, RotateCcw, Wine, Printer,
 } from 'lucide-react';
 
 /* ============================ Glavna komponenta ============================ */
@@ -500,6 +501,17 @@ function ItemRow({ item, qty, variant, onQty, onVariant }) {
               ))}
             </select>
           )}
+          <div className="mt-2 flex gap-1.5">
+            {[5, 10].map((n) => (
+              <button
+                key={n}
+                onClick={() => onQty((qty || 0) + n)}
+                className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-sky-100 dark:hover:bg-sky-500/20 hover:text-sky-700 dark:hover:text-sky-300 transition"
+              >
+                +{n}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
@@ -707,6 +719,13 @@ function OrderSummaryModal({ show, onClose, orders, variants, items, notes, doSh
           Ukupno stavki: {orderedItems.length}
         </p>
         <ShareButtons doShare={doShare} disabled={orderedItems.length === 0} />
+        <button
+          onClick={() => printOrder(items, orders, variants, notes)}
+          disabled={orderedItems.length === 0}
+          className="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition"
+        >
+          <Printer className="h-4 w-4" /> Štampaj / Sačuvaj PDF
+        </button>
       </div>
     </ModalShell>
   );
